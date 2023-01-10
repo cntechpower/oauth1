@@ -14,7 +14,7 @@
 
 // Package oauth is consumer interface for OAuth 1.0, OAuth 1.0a and RFC 5849.
 //
-// Redirection-based Authorization
+// # Redirection-based Authorization
 //
 // This section outlines how to use the oauth package in redirection-based
 // authorization (http://tools.ietf.org/html/rfc5849#section-2).
@@ -40,7 +40,7 @@
 // secret and verifier, request token credentials using the client RequestToken
 // method. Save the returned credentials for later use in the application.
 //
-// Signing Requests
+// # Signing Requests
 //
 // The Client type has two low-level methods for signing requests, SignForm and
 // SetAuthorizationHeader.
@@ -58,15 +58,15 @@
 // supplied net/http Client. These methods are easy to use, but not as flexible
 // as constructing a request using one of the low-level methods.
 //
-// Context With HTTP Client
+// # Context With HTTP Client
 //
 // A context-enabled method can include a custom HTTP client in the
 // context and execute an HTTP request using the included HTTP client.
 //
-//     hc := &http.Client{Timeout: 2 * time.Second}
-//     ctx := context.WithValue(context.Background(), oauth.HTTPClient, hc)
-//     c := oauth.Client{ /* Any settings */ }
-//     resp, err := c.GetContext(ctx, &oauth.Credentials{}, rawurl, nil)
+//	hc := &http.Client{Timeout: 2 * time.Second}
+//	ctx := context.WithValue(context.Background(), oauth.HTTPClient, hc)
+//	c := oauth.Client{ /* Any settings */ }
+//	resp, err := c.GetContext(ctx, &oauth.Credentials{}, rawurl, nil)
 package oauth // import "github.com/gomodule/oauth1/oauth"
 
 import (
@@ -467,6 +467,7 @@ func (c *Client) SignParam(credentials *Credentials, method, urlStr string, para
 }
 
 var oauthKeys = []string{
+	"realm",
 	"oauth_consumer_key",
 	"oauth_nonce",
 	"oauth_signature",
@@ -479,10 +480,15 @@ var oauthKeys = []string{
 	"oauth_session_handle",
 }
 
-func (c *Client) authorizationHeader(r *request) (string, error) {
+func (c *Client) authorizationHeader(r *request, extraParamsSkipSign ...map[string]string) (string, error) {
 	p, err := c.oauthParams(r)
 	if err != nil {
 		return "", err
+	}
+	for _, e := range extraParamsSkipSign {
+		for k, v := range e {
+			p[k] = v
+		}
 	}
 	var h []byte
 	// Append parameters in a fixed order to support testing.
@@ -511,6 +517,17 @@ func (c *Client) AuthorizationHeader(credentials *Credentials, method string, u 
 	// this method does not return an error.
 	v, _ := c.authorizationHeader(&request{credentials: credentials, method: method, u: u, form: params})
 	return v
+}
+
+// AuthorizationHeaderWithRealm returns the HTTP authorization header value for given
+// method, URL and parameters, support realm.
+func (c *Client) AuthorizationHeaderWithRealm(credentials *Credentials, method string, u *url.URL, params url.Values, realm string) (string, error) {
+	// Signing a request can return an error. This method is deprecated because
+	// this method does not return an error.
+	v, err := c.authorizationHeader(&request{credentials: credentials, method: method, u: u, form: params}, map[string]string{
+		"realm": realm,
+	})
+	return v, err
 }
 
 // SetAuthorizationHeader adds an OAuth signature to a request header.
